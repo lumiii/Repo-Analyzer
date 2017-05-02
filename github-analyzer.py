@@ -4,6 +4,7 @@ import subprocess
 import dependency
 from custom_types import Rule, Job, JobProp
 import params
+import auth
 from tqdm import tqdm
 
 # curr_job = Job("D:\\Makefile\\openage", ['makefile', '.cmake', 'cmakelists'], ['.cpp'])
@@ -22,7 +23,7 @@ def __calculate_order(commits):
 
 
 def init():
-    github = Github(params.access_token)
+    github = Github(auth.access_token)
     repo = github.get_repo(params.repo_id)
     job_prop.repo= repo
     job_prop.commit_order = __calculate_order(repo.get_commits())
