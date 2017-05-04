@@ -46,7 +46,6 @@ def __filter_filelist(files, status):
     return [f for f in files if f.status == status]
 
 
-
 def __get_extension(path_str):
     if path_str.find('.') == -1:
         return None
@@ -159,9 +158,26 @@ def __find_new_sources(commit):
     return path_strs
 
 
-def __filter_changes(diff):
-    return [line for line in diff if line.startswith(u'-') or line.startswith(u'+')]
+def __filter_changes(diff, diff_encoding):
+    output = []
 
+    for line in diff:
+        out_line = line
+        try:
+            if type(out_line) is not unicode:
+                if diff_encoding is not None:
+                    out_line = unicode(out_line, encoding=diff_encoding)
+                else:
+                    out_line = unicode(out_line)
+        except UnicodeWarning:
+            pass
+        except UnicodeDecodeError:
+            pass
+
+        if out_line.startswith(u'-') or line.startswith(u'+'):
+            output.append(out_line)
+
+    return output
 
 def __file_content_changed(git_file):
     return git_file.additions > 0 or git_file.changes > 0 or git_file.deletions > 0
@@ -183,7 +199,7 @@ def __get_file_from_tree(file_path, commit):
 
 def __get_diff(git_file, commit):
     if git_file.patch is not None:
-        return __filter_changes(git_file.patch.split('\n'))
+        return __filter_changes(git_file.patch.split('\n'), None)
 
     # an empty change, usually simple rename or adding file without content - no new changes to be observed
     if not __file_content_changed(git_file):
@@ -192,9 +208,10 @@ def __get_diff(git_file, commit):
     response = requests.get(git_file.raw_url)
     assert response.ok
 
+    encoding = response.encoding
     content = response.text.split('\n')
     if git_file.status == STATUS_ADDED:
-        return __filter_changes(difflib.unified_diff([''], content, n=0))
+        return __filter_changes(difflib.unified_diff([''], content, n=0), encoding)
 
     assert git_file.status == STATUS_MODIFIED or git_file.status == STATUS_RENAMED
     if git_file.status == STATUS_MODIFIED:
@@ -205,7 +222,8 @@ def __get_diff(git_file, commit):
     prev_content = __get_file_from_tree(prev_filename, commit.parents[0])
     assert prev_content is not None
     prev_content = prev_content.split('\n')
-    return __filter_changes(difflib.unified_diff(prev_content, content, n=0))
+
+    return __filter_changes(difflib.unified_diff(prev_content, content, n=0), encoding)
 
 
 def __check_diff_for_source(git_file, commit, source_path_strs_type, matches):
@@ -215,7 +233,7 @@ def __check_diff_for_source(git_file, commit, source_path_strs_type, matches):
     makefile_path = git_file.filename
 
     diff = __get_diff(git_file, commit)
-    for line in tqdm(diff, desc='Diff', disable=(len(diff) < 1000)):
+    for line in diff:
         for path_str, change_type in source_path_strs_type:
             if (line.startswith(u'-') and change_type == STATUS_DELETED) or \
                     (line.startswith(u'+') and change_type in [STATUS_ADDED, STATUS_RENAMED]):
@@ -236,7 +254,7 @@ def __check_changed_filename(commit, source_path_strs_type):
     # get a list of files with changes that still remain after this commit (no deletes)
     file_list = __filter_filelist(commit.files, [STATUS_ADDED, STATUS_RENAMED, STATUS_MODIFIED])
 
-    for git_file in tqdm(file_list, desc='Files', disable=len(file_list) < 100):
+    for git_file in file_list:
         __check_diff_for_source(git_file, commit, source_path_strs_type, matches)
 
     return matches
@@ -363,7 +381,7 @@ def check(commit):
 def __check_makefile_for_source(source, makefile):
     with open(makefile) as f:
         for line in f:
-            if source in line:
+            if source in unicode(line, encoding='utf-8'):
                 return True
 
     return False

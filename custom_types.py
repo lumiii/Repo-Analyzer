@@ -9,4 +9,4 @@ DependencyRecord = recordtype('DependencyRecord', 'commits makefile_records')
 # stores all the information that may be needed
 DiffJob = namedtuple('DiffJob', ['commit', 'diffs'])
 FilePath = recordtype('FilePath', 'path deleted')
-JobProp = recordtype('JobProp', 'repo commit_order')
+JobProp = recordtype('JobProp', 'repo commit_order commit_list')
