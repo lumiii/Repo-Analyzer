@@ -4,6 +4,7 @@ import math
 
 Population = recordtype('Population', 'rate total score')
 
+
 # populations = {key : Population, key2 : Population...etc}
 def compute_ranking(populations):
     p0 = __compute_p0(populations)
